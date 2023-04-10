@@ -1,5 +1,7 @@
 package com.example.mybot.listener;
 
+import com.example.mybot.entity.NotificationTask;
+import com.example.mybot.service.NotificationTaskService;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.Message;
@@ -24,12 +26,16 @@ import java.util.regex.Pattern;
 public class TelegramBotUpdatesListener implements UpdatesListener {
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
     private final Pattern pattern = Pattern.compile
-            ("(\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2})\\s+([А-я\\d\\s.,!?:]+)");
-    private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.mm.yyyy HH:mm");
-    private final TelegramBot telegramBot;
+            ("(\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2})\\s"+"([А-я\\d\\s.,!?:]+)");
+    private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
-    public TelegramBotUpdatesListener(TelegramBot telegramBot) {
+    private final TelegramBot telegramBot;
+    private final  NotificationTaskService notificationTaskService;
+
+    public TelegramBotUpdatesListener(TelegramBot telegramBot,
+                                      NotificationTaskService notificationTaskService) {
         this.telegramBot = telegramBot;
+        this.notificationTaskService=notificationTaskService;
     }
 
     @PostConstruct
@@ -40,9 +46,11 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
     // реагируем на команду /start
     @Override
-    public int process(List<Update> list) {
+    public int process(List<Update> updates) {
         try {
-            list.forEach(update -> {
+            updates.stream()
+                    .filter(update -> update.message() != null)
+            .forEach(update -> {
                 logger.info("Handles update: {}", update);
                 Message message = update.message();
                 Long chatId = message.chat().id();
@@ -50,7 +58,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
                 if ("/start".equals(text)) {
                     sendMessage(chatId, """
-                            Привет! Я помогу тебе запланировать задачу. Отправь ее в формате 12.03.2023 21:00 
+                            Привет! Я помогу тебе запланировать задачу. Отправь ее в формате: 12.03.2023 21:00 
                             Сделать домашку
                             """);
                 } else if (text != null) {
@@ -58,9 +66,15 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                     if (matcher.find()) {
                         LocalDateTime dateTime = parse(matcher.group(1));
                         if (Objects.isNull(dateTime)) {
-                            sendMessage(chatId, "Неккоректный формат даты и или времени!");
+                            sendMessage(chatId, "Неккоректный формат даты и/или времени!");
                         } else {
                             String txt = matcher.group(2);
+                            NotificationTask notificationTask = new NotificationTask();
+                            notificationTask.setChatId(chatId);
+                            notificationTask.setMessage(txt);
+                            notificationTask.setNotificationDateTime(dateTime);
+                            notificationTaskService.save(notificationTask);
+                            sendMessage(chatId, "Задача успешно запланирована!");
 
                         }
                     } else {
