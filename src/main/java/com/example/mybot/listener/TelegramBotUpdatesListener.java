@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 @Component
 public class TelegramBotUpdatesListener implements UpdatesListener {
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
+    //создать регулярное выражение pattern
     private final Pattern pattern = Pattern.compile
             ("(\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2})\\s"+"([А-я\\d\\s.,!?:]+)");
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
@@ -52,8 +53,8 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                     .filter(update -> update.message() != null)
             .forEach(update -> {
                 logger.info("Handles update: {}", update);
-                Message message = update.message();
-                Long chatId = message.chat().id();
+                Message message = update.message();// сообщения
+                Long chatId = message.chat().id();// нужен боту что бы ответить на сообщения
                 String text = message.text();
 
                 if ("/start".equals(text)) {
@@ -69,10 +70,13 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                             sendMessage(chatId, "Неккоректный формат даты и/или времени!");
                         } else {
                             String txt = matcher.group(2);
+                            //база данных
                             NotificationTask notificationTask = new NotificationTask();
                             notificationTask.setChatId(chatId);
                             notificationTask.setMessage(txt);
                             notificationTask.setNotificationDateTime(dateTime);
+
+                            //сохр в бд
                             notificationTaskService.save(notificationTask);
                             sendMessage(chatId, "Задача успешно запланирована!");
 
